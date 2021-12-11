@@ -198,6 +198,9 @@ export class DomRendererRowFactory {
             if (isInverse) {
               charElement.classList.add(`xterm-fg-${INVERTED_DEFAULT_COLOR}`);
             }
+            if (cell.isBold() && this._optionsService.options.drawBoldTextInBrightColors) {
+              this._addStyle(charElement, `color:${rgba.increaseIntensity(this._colors.foreground.rgba).css}`);
+            }
           }
       }
 

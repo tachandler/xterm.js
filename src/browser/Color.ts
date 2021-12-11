@@ -207,6 +207,22 @@ export namespace rgba {
       rgba: channels.toRgba(r, g, b)
     };
   }
+
+  export function increaseIntensity (value: number): IColor {
+    const r = (value >> 24) & 0xFF;
+    const g = (value >> 16) & 0xFF;
+    const b = (value >> 8) & 0xFF;
+    const a = value & 0xFF;
+    const i = (() => {
+      const intensity = 255 - Math.max(r, g, b);
+      // limit intensity shift of 10-30%, even if it incurs a color shift
+      return (intensity > 76) ? 76 : (intensity < 26) ? 26 : intensity;
+    })();
+    return {
+      css: channels.toCss(Math.min(r + i, 255), Math.min(g + i, 255), Math.min(b + i, 255), a),
+      rgba: channels.toRgba(Math.min(r + i, 255), Math.min(g + i, 255), Math.min(b + i, 255), a)
+    };
+  }
 }
 
 export function toPaddedHex(c: number): string {

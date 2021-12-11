@@ -365,7 +365,11 @@ export abstract class BaseRenderLayer implements IRenderLayer {
       if (fgOverride) {
         this._ctx.fillStyle = fgOverride.css;
       } else if (cell.isFgDefault()) {
-        this._ctx.fillStyle = this._colors.foreground.css;
+        if (cell.isBold() && this._optionsService.options.drawBoldTextInBrightColors) {
+          this._ctx.fillStyle = rgba.increaseIntensity(this._colors.foreground.rgba).css;
+        } else {
+          this._ctx.fillStyle = this._colors.foreground.css;
+        }
       } else if (cell.isFgRGB()) {
         this._ctx.fillStyle = `rgb(${AttributeData.toColorRGB(cell.getFgColor()).join(',')})`;
       } else {
@@ -506,8 +510,10 @@ export abstract class BaseRenderLayer implements IRenderLayer {
         if (inverse) {
           return this._colors.background.rgba;
         }
+        if (bold && this._optionsService.options.drawBoldTextInBrightColors) {
+          return rgba.increaseIntensity(this._colors.foreground.rgba).rgba;
+        }
         return this._colors.foreground.rgba;
     }
   }
 }
-

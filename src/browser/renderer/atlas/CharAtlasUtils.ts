@@ -27,6 +27,7 @@ export function generateConfig(scaledCharWidth: number, scaledCharHeight: number
     fontWeight: options.fontWeight,
     fontWeightBold: options.fontWeightBold,
     allowTransparency: options.allowTransparency,
+    drawBoldTextInBrightColors: options.drawBoldTextInBrightColors,
     colors: clonedColors
   };
 }
@@ -45,6 +46,7 @@ export function configEquals(a: ICharAtlasConfig, b: ICharAtlasConfig): boolean 
       a.allowTransparency === b.allowTransparency &&
       a.scaledCharWidth === b.scaledCharWidth &&
       a.scaledCharHeight === b.scaledCharHeight &&
+      a.drawBoldTextInBrightColors === b.drawBoldTextInBrightColors &&
       a.colors.foreground === b.colors.foreground &&
       a.colors.background === b.colors.background;
 }

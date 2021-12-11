@@ -242,6 +242,9 @@ export class WebglCharAtlas implements IDisposable {
           }
           return bg;
         }
+        if (bold && this._config.drawBoldTextInBrightColors) {
+          return rgba.increaseIntensity(this._config.colors.foreground.rgba).css;
+        }
         return this._config.colors.foreground.css;
     }
   }
@@ -276,6 +279,9 @@ export class WebglCharAtlas implements IDisposable {
       default:
         if (inverse) {
           return this._config.colors.background.rgba;
+        }
+        if (bold && this._config.drawBoldTextInBrightColors) {
+          return rgba.increaseIntensity(this._config.colors.foreground.rgba).rgba;
         }
         return this._config.colors.foreground.rgba;
     }
