@@ -636,9 +636,27 @@ declare module 'xterm' {
     readonly modes: IModes;
 
     /**
-     * Get the terminal options
+     * Gets or sets the terminal options. This supports setting multiple options.
+     *
+     * @example Get a single option
+     * ```typescript
+     * console.log(terminal.options.fontSize);
+     * ```
+     *
+     * @example Set a single option
+     * ```typescript
+     * terminal.options.fontSize = 12;
+     * ```
+     *
+     * @example Set multiple options
+     * ```typescript
+     * terminal.options = {
+     *   fontSize: 12,
+     *   fontFamily: 'Arial',
+     * };
+     * ```
      */
-    readonly options: ITerminalOptions;
+    options: ITerminalOptions;
 
     /**
      * Natural language strings that can be localized.
@@ -794,9 +812,9 @@ declare module 'xterm' {
     deregisterLinkMatcher(matcherId: number): void;
 
     /**
-     * (EXPERIMENTAL) Registers a link provider, allowing a custom parser to
-     * be used to match and handle links. Multiple link providers can be used,
-     * they will be asked in the order in which they are registered.
+     * Registers a link provider, allowing a custom parser to be used to match
+     * and handle links. Multiple link providers can be used, they will be asked
+     * in the order in which they are registered.
      * @param linkProvider The link provider to use to detect links.
      */
     registerLinkProvider(linkProvider: ILinkProvider): IDisposable;
