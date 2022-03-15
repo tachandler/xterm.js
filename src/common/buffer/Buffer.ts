@@ -585,15 +585,31 @@ export class Buffer implements IBuffer {
     return x >= this._cols ? this._cols - 1 : x < 0 ? 0 : x;
   }
 
-  public clearMarkers(y?: number): void {
+  /**
+   * Clears markers on single line.
+   * @param y The line to clear.
+   */
+  public clearMarkers(y: number): void {
     this._isClearing = true;
-    if (y) {
-      for (const marker of this.markers.filter(m => m.line === y)) {
-        marker.dispose();
+    for (let i = 0; i < this.markers.length; i++) {
+      if (this.markers[i].line === y) {
+        this.markers[i].dispose();
+        this.markers.splice(i--, 1);
       }
-    } else {
-      for (const marker of this.markers) {
-        marker.dispose();
+    }
+    this._isClearing = false;
+  }
+
+  /**
+   * Clears markers on all lines except for those on a particular line.
+   * @param excludeY The line to exclude.
+   */
+  public clearAllMarkers(excludeY: number): void {
+    this._isClearing = true;
+    for (let i = 0; i < this.markers.length; i++) {
+      if (this.markers[i].line !== excludeY) {
+        this.markers[i].dispose();
+        this.markers.splice(i--, 1);
       }
     }
     this._isClearing = false;
