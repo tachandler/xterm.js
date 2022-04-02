@@ -453,7 +453,7 @@ declare module 'xterm' {
    */
   interface IDecorationOverviewRulerOptions {
     color: string;
-    position?: 'left' | 'center' | 'right';
+    position?: 'left' | 'center' | 'right' | 'full';
   }
 
   /*
