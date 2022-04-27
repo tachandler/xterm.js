@@ -13,6 +13,7 @@ import { IDisposable } from 'xterm';
 import { AttributeData } from 'common/buffer/AttributeData';
 import { channels, rgba } from 'browser/Color';
 import { tryDrawCustomChar } from 'browser/renderer/CustomGlyphs';
+import { isPowerlineGlyph } from 'browser/renderer/RendererUtils';
 
 // For debugging purposes, it can be useful to set this to a really tiny value,
 // to verify that LRU eviction works.
@@ -216,8 +217,8 @@ export class WebglCharAtlas implements IDisposable {
     }
   }
 
-  private _getForegroundCss(bg: number, bgColorMode: number, bgColor: number, fg: number, fgColorMode: number, fgColor: number, inverse: boolean, bold: boolean): string {
-    const minimumContrastCss = this._getMinimumContrastCss(bg, bgColorMode, bgColor, fg, fgColorMode, fgColor, inverse, bold);
+  private _getForegroundCss(bg: number, bgColorMode: number, bgColor: number, fg: number, fgColorMode: number, fgColor: number, inverse: boolean, bold: boolean, isPowerLineGlyph: boolean): string {
+    const minimumContrastCss = this._getMinimumContrastCss(bg, bgColorMode, bgColor, fg, fgColorMode, fgColor, inverse, bold, isPowerLineGlyph);
     if (minimumContrastCss) {
       return minimumContrastCss;
     }
@@ -287,8 +288,8 @@ export class WebglCharAtlas implements IDisposable {
     }
   }
 
-  private _getMinimumContrastCss(bg: number, bgColorMode: number, bgColor: number, fg: number, fgColorMode: number, fgColor: number, inverse: boolean, bold: boolean): string | undefined {
-    if (this._config.minimumContrastRatio === 1) {
+  private _getMinimumContrastCss(bg: number, bgColorMode: number, bgColor: number, fg: number, fgColorMode: number, fgColor: number, inverse: boolean, bold: boolean, isPowerLineGlyph: boolean): string | undefined {
+    if (this._config.minimumContrastRatio === 1 || isPowerLineGlyph) {
       return undefined;
     }
 
@@ -376,26 +377,16 @@ export class WebglCharAtlas implements IDisposable {
       `${fontStyle} ${fontWeight} ${this._config.fontSize * this._config.devicePixelRatio}px ${this._config.fontFamily}`;
     this._tmpCtx.textBaseline = TEXT_BASELINE;
 
-    this._tmpCtx.fillStyle = this._getForegroundCss(bg, bgColorMode, bgColor, fg, fgColorMode, fgColor, inverse, bold);
+    const powerLineGlyph = chars.length === 1 && isPowerlineGlyph(chars.charCodeAt(0));
+    this._tmpCtx.fillStyle = this._getForegroundCss(bg, bgColorMode, bgColor, fg, fgColorMode, fgColor, inverse, bold, powerLineGlyph);
 
     // Apply alpha to dim the character
     if (dim) {
       this._tmpCtx.globalAlpha = DIM_OPACITY;
     }
 
-    // Check if the char is a powerline glyph, these will be restricted to a single cell glyph, no
-    // padding on either side that are allowed for other glyphs since they are designed to be pixel
-    // perfect but may render with "bad" anti-aliasing
-    let isPowerlineGlyph = false;
-    if (chars.length === 1) {
-      const code = chars.charCodeAt(0);
-      if (code >= 0xE0A0 && code <= 0xE0D6) {
-        isPowerlineGlyph = true;
-      }
-    }
-
     // For powerline glyphs left/top padding is excluded (https://github.com/microsoft/vscode/issues/120129)
-    const padding = isPowerlineGlyph ? 0 : TMP_CANVAS_GLYPH_PADDING;
+    const padding = powerLineGlyph ? 0 : TMP_CANVAS_GLYPH_PADDING;
 
     // Draw custom characters if applicable
     let drawSuccess = false;
@@ -465,7 +456,7 @@ export class WebglCharAtlas implements IDisposable {
       return NULL_RASTERIZED_GLYPH;
     }
 
-    const rasterizedGlyph = this._findGlyphBoundingBox(imageData, this._workBoundingBox, allowedWidth, isPowerlineGlyph, drawSuccess);
+    const rasterizedGlyph = this._findGlyphBoundingBox(imageData, this._workBoundingBox, allowedWidth, powerLineGlyph, drawSuccess);
     const clippedImageData = this._clipImageData(imageData, this._workBoundingBox);
 
     // Check if there is enough room in the current row and go to next if needed

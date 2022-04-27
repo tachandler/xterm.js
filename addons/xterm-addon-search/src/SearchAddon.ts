@@ -51,7 +51,6 @@ const LINES_CACHE_TIME_TO_LIVE = 15 * 1000; // 15 secs
 
 export class SearchAddon implements ITerminalAddon {
   private _terminal: Terminal | undefined;
-  private _dataChanged: boolean = false;
   private _cachedSearchTerm: string | undefined;
   private _selectedDecoration: IDecoration | undefined;
   private _resultDecorations: Map<number, IDecoration[]> | undefined;
@@ -77,13 +76,22 @@ export class SearchAddon implements ITerminalAddon {
   public activate(terminal: Terminal): void {
     this._terminal = terminal;
     this._onDataDisposable = this._terminal.onData(() => {
-      this._dataChanged = true;
       if (this._highlightTimeout) {
         window.clearTimeout(this._highlightTimeout);
       }
       if (this._cachedSearchTerm && this._lastSearchOptions?.decorations) {
         this._highlightTimeout = setTimeout(() => {
-          this.findPrevious(this._cachedSearchTerm!,  { ...this._lastSearchOptions, incremental: true });
+          this._highlightAllMatches(this._cachedSearchTerm!,  { ...this._lastSearchOptions, incremental: true });
+        }, 200);
+      }
+    });
+    this._terminal.onResize(() => {
+      if (this._highlightTimeout) {
+        window.clearTimeout(this._highlightTimeout);
+      }
+      if (this._cachedSearchTerm && this._lastSearchOptions?.decorations) {
+        this._highlightTimeout = setTimeout(() => {
+          this._highlightAllMatches(this._cachedSearchTerm!,  { ...this._lastSearchOptions, incremental: true });
         }, 200);
       }
     });
@@ -103,11 +111,8 @@ export class SearchAddon implements ITerminalAddon {
       }
     });
     this._resultDecorations?.clear();
-    this._cachedSearchTerm = undefined;
     this._searchResults = undefined;
     this._resultDecorations = undefined;
-    this._dataChanged = true;
-    this._resultIndex = undefined;
   }
 
   /**
@@ -123,17 +128,11 @@ export class SearchAddon implements ITerminalAddon {
     }
     this._lastSearchOptions = searchOptions;
     if (searchOptions?.decorations) {
-      this._highlightAllMatches(term, searchOptions);
-    }
-    const next = this._findNextAndSelect(term, searchOptions);
-    if (searchOptions?.decorations) {
-      if (next && this._resultIndex !== undefined && this._searchResults?.size) {
-        this._onDidChangeResults.fire({ resultIndex: this._resultIndex, resultCount: this._searchResults.size });
-      } else {
-        this._onDidChangeResults.fire(undefined);
+      if (this._resultIndex || this._cachedSearchTerm && term !== this._cachedSearchTerm) {
+        this._highlightAllMatches(term, searchOptions);
       }
     }
-    return next;
+    return this._fireResults(term, this._findNextAndSelect(term, searchOptions), searchOptions);
   }
 
   private _highlightAllMatches(term: string, searchOptions: ISearchOptions): void {
@@ -160,6 +159,11 @@ export class SearchAddon implements ITerminalAddon {
         result.col + result.term.length >= this._terminal.cols ? 0 : result.col + 1,
         searchOptions
       );
+      if (this._searchResults.size > 1000) {
+        this.clearDecorations();
+        this._resultIndex = undefined;
+        return;
+      }
     }
     this._searchResults.forEach(result => {
       const resultDecoration = this._createResultDecoration(result, searchOptions.decorations!);
@@ -169,12 +173,6 @@ export class SearchAddon implements ITerminalAddon {
         resultDecorations.set(resultDecoration.marker.line, decorationsForLine);
       }
     });
-    if (this._dataChanged) {
-      this._dataChanged = false;
-    }
-    if (this._searchResults.size > 0) {
-      this._cachedSearchTerm = term;
-    }
   }
 
   private _find(term: string, startRow: number, startCol: number, searchOptions?: ISearchOptions): ISearchResult | undefined {
@@ -219,9 +217,15 @@ export class SearchAddon implements ITerminalAddon {
     if (!this._terminal || !term || term.length === 0) {
       this._terminal?.clearSelection();
       this.clearDecorations();
+      this._cachedSearchTerm = undefined;
+      this._resultIndex = -1;
       return false;
     }
 
+    if (this._cachedSearchTerm !== term) {
+      this._resultIndex = undefined;
+      this._terminal.clearSelection();
+    }
 
     let startCol = 0;
     let startRow = 0;
@@ -287,7 +291,6 @@ export class SearchAddon implements ITerminalAddon {
         }
       }
     }
-
     // Set selection and scroll if a result was found
     return this._selectResult(result, searchOptions?.decorations);
   }
@@ -303,18 +306,24 @@ export class SearchAddon implements ITerminalAddon {
       throw new Error('Cannot use addon until it has been loaded');
     }
     this._lastSearchOptions = searchOptions;
-    if (searchOptions?.decorations) {
+    if (searchOptions?.decorations && (this._resultIndex || term !== this._cachedSearchTerm)) {
       this._highlightAllMatches(term, searchOptions);
     }
-    const previous = this._findPreviousAndSelect(term, searchOptions);
+    return this._fireResults(term, this._findPreviousAndSelect(term, searchOptions), searchOptions);
+  }
+
+  private _fireResults(term: string, found: boolean, searchOptions?: ISearchOptions): boolean {
     if (searchOptions?.decorations) {
-      if (previous && this._resultIndex !== undefined && this._searchResults?.size) {
+      if (found && this._resultIndex !== undefined && this._searchResults?.size) {
         this._onDidChangeResults.fire({ resultIndex: this._resultIndex, resultCount: this._searchResults.size });
+      } else if (this._resultIndex === -1) {
+        this._onDidChangeResults.fire({ resultIndex: -1, resultCount: -1 });
       } else {
         this._onDidChangeResults.fire(undefined);
       }
     }
-    return previous;
+    this._cachedSearchTerm = term;
+    return found;
   }
 
   private _findPreviousAndSelect(term: string, searchOptions?: ISearchOptions): boolean {
@@ -326,7 +335,13 @@ export class SearchAddon implements ITerminalAddon {
       result = undefined;
       this._terminal?.clearSelection();
       this.clearDecorations();
+      this._resultIndex = -1;
       return false;
+    }
+
+    if (this._cachedSearchTerm !== term) {
+      this._resultIndex = undefined;
+      this._terminal.clearSelection();
     }
 
     let startRow = this._terminal.buffer.active.baseY + this._terminal.rows;
@@ -387,7 +402,7 @@ export class SearchAddon implements ITerminalAddon {
     }
 
     if (this._searchResults) {
-      if (this._resultIndex === undefined) {
+      if (this._resultIndex === undefined || this._resultIndex < 0) {
         this._resultIndex = this._searchResults?.size - 1;
       } else {
         this._resultIndex--;
@@ -710,7 +725,7 @@ export class SearchAddon implements ITerminalAddon {
       marker,
       x: result.col,
       width: result.size,
-      overviewRulerOptions: this._resultDecorations?.get(marker.line) && !this._dataChanged ? undefined : {
+      overviewRulerOptions: this._resultDecorations?.get(marker.line) ? undefined : {
         color: decorations.matchOverviewRuler, position: 'center'
       }
     });
