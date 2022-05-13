@@ -177,7 +177,11 @@ export class DomRendererRowFactory {
       // been applied
       let bgOverride: IColor | undefined;
       let fgOverride: IColor | undefined;
+      let isTop = false;
       for (const d of this._decorationService.getDecorationsAtCell(x, row)) {
+        if (d.options.layer !== 'top' && isTop) {
+          continue;
+        }
         if (d.backgroundColorRGB) {
           bgColorMode = Attributes.CM_RGB;
           bg = d.backgroundColorRGB.rgba >> 8 & 0xFFFFFF;
@@ -188,6 +192,12 @@ export class DomRendererRowFactory {
           fg = d.foregroundColorRGB.rgba >> 8 & 0xFFFFFF;
           fgOverride = d.foregroundColorRGB;
         }
+        isTop = d.options.layer === 'top';
+      }
+
+      // If it's a top decoration, render above the selection
+      if (isTop) {
+        charElement.classList.add(`xterm-decoration-top`);
       }
 
       // Foreground
