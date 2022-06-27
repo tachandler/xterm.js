@@ -703,10 +703,13 @@ export class Terminal extends CoreTerminal implements ITerminal {
           but = ev.button < 3 ? ev.button : CoreMouseButton.NONE;
           break;
         case 'wheel':
-          // only UP/DOWN wheel events are respected
-          if ((ev as WheelEvent).deltaY !== 0) {
-            action = (ev as WheelEvent).deltaY < 0 ? CoreMouseAction.UP : CoreMouseAction.DOWN;
+          const amount = self.viewport!.getLinesScrolled(ev as WheelEvent);
+
+          if (amount === 0) {
+            return false;
           }
+
+          action = (ev as WheelEvent).deltaY < 0 ? CoreMouseAction.UP : CoreMouseAction.DOWN;
           but = CoreMouseButton.WHEEL;
           break;
         default:
@@ -1096,14 +1099,17 @@ export class Terminal extends CoreTerminal implements ITerminal {
       return false;
     }
 
-    if (!this._compositionHelper!.keydown(event)) {
+    // Ignore composing with Alt key on Mac when macOptionIsMeta is enabled
+    const shouldIgnoreComposition = this.browser.isMac && this.options.macOptionIsMeta && event.altKey;
+
+    if (!shouldIgnoreComposition && !this._compositionHelper!.keydown(event)) {
       if (this.buffer.ybase !== this.buffer.ydisp) {
         this._bufferService.scrollToBottom();
       }
       return false;
     }
 
-    if (event.key === 'Dead' || event.key === 'AltGraph') {
+    if (!shouldIgnoreComposition && (event.key === 'Dead' || event.key === 'AltGraph')) {
       this._unprocessedDeadKey = true;
     }
 
@@ -1132,6 +1138,14 @@ export class Terminal extends CoreTerminal implements ITerminal {
 
     if (!result.key) {
       return true;
+    }
+
+    // HACK: Process A-Z in the keypress event to fix an issue with macOS IMEs where lower case
+    // letters cannot be input while caps lock is on.
+    if (event.key && !event.ctrlKey && !event.altKey && !event.metaKey && event.key.length === 1) {
+      if (event.key.charCodeAt(0) >= 65 && event.key.charCodeAt(0) <= 90) {
+        return true;
+      }
     }
 
     if (this._unprocessedDeadKey) {
